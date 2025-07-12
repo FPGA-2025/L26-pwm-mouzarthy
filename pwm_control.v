@@ -14,4 +14,60 @@ module PWM_Control #(
     localparam QUARTER_SECOND = SECOND / 4;
     localparam EIGHTH_SECOND  = SECOND / 8;
 
+    localparam [15:0] DUTY_MIN = PWM_CLK_PERIOD * 25 / 1_000_000; // 0.0025% duty cycle
+    localparam [15:0] DUTY_MAX = PWM_CLK_PERIOD * 70 / 100; // 70% duty cycle
+
+    reg [15:0] duty_cycle = DUTY_MIN;
+    reg [23:0] fade_counter = 0;
+    reg p = 1;
+
+    wire pwm_out;
+
+    PWM pwm_inst(
+        .clk(clk),
+        .rst_n(rst_n),
+        .duty_cycle(duty_cycle),
+        .period(PWM_CLK_PERIOD[15:0]),
+        .pwm_out(pwm_out)
+    );
+
+    always @( posedge clk or negedge rst_n ) 
+    begin
+    if( !rst_n ) 
+    begin
+        duty_cycle      <= DUTY_MIN;
+        fade_counter    <= 0;
+        p               <= 1;
+    end 
+    else 
+    begin
+        if( fade_counter >= EIGHTH_SECOND ) 
+        begin
+            fade_counter <= 0;
+
+            if( p ) 
+            begin
+                if( duty_cycle < DUTY_MAX )
+                    duty_cycle <= duty_cycle + 1;
+                else
+                    p <= 0;
+            end
+            else 
+            begin
+                if( duty_cycle > DUTY_MIN )
+                    duty_cycle <= duty_cycle - 1;
+                else
+                    p <= 1;
+            end
+
+        end 
+        else 
+        begin
+            fade_counter <= fade_counter + 1;
+        end
+    end
+end
+
+assign leds = {8{pwm_out}};
+
 endmodule
